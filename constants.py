@@ -1,8 +1,9 @@
 from typing import Dict
 from enums import *
 
-GLOBAL_COEFF = 1
-CURVE_LOG_BASE = 2
+GLOBAL_COEFF = 1.4
+CURVE_LOG_BASE = 1.5
+CURVE_LEN_COEFF = 5
 
 # Chosen arbitrarily; subject to change
 FORCING_TO_RH_ACTIONS: Dict[Forcing, int] = {

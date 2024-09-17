@@ -72,4 +72,4 @@ class Chord:
     def get_intensity(self) -> float:
         """Local intensity of the current chord"""
         local_intensity = self.vel * (self.lh_actions + self.rh_actions)
-        return GLOBAL_COEFF * math.log(1.0 + local_intensity, CURVE_LOG_BASE)
+        return GLOBAL_COEFF * math.log(1.0 + local_intensity / CURVE_LEN_COEFF, CURVE_LOG_BASE)
