@@ -12,7 +12,7 @@ def set_vels(chords: List[Type[Chord]]) -> None:
             chord.vel = 0.0
         else:
             # Velocity = the change in time
-            chord.set_vel(chords[i - 1].time);
+            chord.set_vel(chords[i - 1].time)
 
 
 def set_accs(chords: List[Type[Chord]]) -> None:
@@ -76,7 +76,7 @@ def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
     avg_anch = sum([c.anchored_count for c in chords[1:]]) / (n - 1)
 
     # Half the rock meter size since the middle is the average state
-    sample_size = DIFF_TO_ROCK_METER_SIZE[chart.diff] // 2;
+    sample_size = DIFF_TO_ROCK_METER_SIZE[chart.diff] // 2
 
     local_intensities = [chord.get_intensity() for chord in chords[2:]]
     local_intensities_subset = []

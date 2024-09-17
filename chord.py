@@ -3,13 +3,13 @@ import math
 from constants import *
 from enums import Diff, Forcing
 from typing import Dict, Type
-from utils import count_frets, Shape
+from utils import *
 
 
 class Chord:
-    time: float = None
+    time: float = None              # The timestamp of the chord, NOT length
     shape: float = None             # Bitwise; 0b_00011_0 = GR; 0b_00000_1 = P
-    forcing: Type[Forcing] = None
+    forcing: Type[Forcing] = None   # Strum, HOPO, or tap
 
     vel: float = None               # Reciprocal of delta time
     acc: float = None               # Acceleration by delta velocity
@@ -32,6 +32,8 @@ class Chord:
         self.shape = shape
         self.forcing = forcing
         self.rh_actions = FORCING_TO_RH_ACTIONS[forcing]
+
+        # If a single B (0b_01000_0), then all frets under + open (0b_00111_1)
         self.anchorable_shape = shape - 1 if self.is_single_note() else shape
 
 
@@ -72,4 +74,5 @@ class Chord:
     def get_intensity(self) -> float:
         """Local intensity of the current chord"""
         local_intensity = self.vel * (self.lh_actions + self.rh_actions)
-        return GLOBAL_COEFF * math.log(1.0 + local_intensity / CURVE_LEN_COEFF, CURVE_LOG_BASE)
+        return GLOBAL_COEFF * math.log(1.0 + local_intensity / CURVE_LEN_COEFF,
+                CURVE_LOG_BASE)
