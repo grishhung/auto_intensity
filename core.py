@@ -1,0 +1,112 @@
+from chart import Chart
+from chord import Chord
+from constants import DIFF_TO_ROCK_METER_SIZE
+from enums import Diff, Forcing
+from typing import Any, List, Dict, Type, TypeAlias
+
+
+def set_vels(chords: List[Type[Chord]]) -> None:
+    for i, chord in enumerate(chords):
+        if i < 1:
+            # The first chord has no local velocity
+            chord.vel = 0.0
+        else:
+            # Velocity = the change in time
+            chord.set_vel(chords[i - 1].time);
+
+
+def set_accs(chords: List[Type[Chord]]) -> None:
+    for i, chord in enumerate(chords):
+        if i < 2:
+            # The first two chords have no local acceleration
+            chord.acc = 0.0
+        else:
+            # Acceleration = the change in velocity
+            chord.set_acc(chords[i - 1].vel)
+
+
+def set_lh_actions(chords: List[Type[Chord]]) -> None:
+    for i, chord in enumerate(chords):
+        if i < 1:
+            chord.lh_complexity = 0.0
+        else:
+            prev_shape = chords[i - 1].shape
+            curr_shape = chord.shape
+            chord.set_presses(prev_shape)
+            chord.set_lifts(prev_shape)
+            chord.set_lh_actions()
+
+
+def set_anchored_shapes_and_counts(chords: List[Type[Chord]]) -> None:
+    for i, chord in enumerate(chords):
+        if i < 1:
+            # No frets anchored
+            chord.anch_frets = 0
+        else:
+            chord.set_anchored_shape_and_count(chords[i - 1].anchorable_shape)
+
+
+def print_name(name: str, is_last_chart: bool) -> None:
+    print(('├' if not is_last_chart else '└') + f'── {name}')
+
+
+def print_stat(stat: str, value: float, is_last_chart: bool,
+               is_last_stat: bool) -> None:
+    print(('│' if not is_last_chart else ' ') + '   '
+            + ('├' if not is_last_stat else '└')
+            + f'── {stat:<20}{value}')
+
+
+def prepare_chart_for_stat_collection(chart: Type[Chart]) -> None:
+    chords = chart.chords
+
+    set_vels(chords)
+    set_accs(chords)
+    set_anchored_shapes_and_counts(chords)
+    set_lh_actions(chords)
+
+
+def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
+    chords = chart.chords
+    n = len(chords)
+
+    avg_vel = sum([c.vel for c in chords[1:]]) / (n - 1)
+    avg_abs_acc = sum([abs(c.acc) for c in chords[2:]]) / (n - 2)
+    avg_lh_actions = sum([c.lh_actions for c in chords[1:]]) / (n - 1)
+    avg_anch = sum([c.anchored_count for c in chords[1:]]) / (n - 1)
+
+    # Half the rock meter size since the middle is the average state
+    sample_size = DIFF_TO_ROCK_METER_SIZE[chart.diff] // 2;
+
+    local_intensities = [chord.get_intensity() for chord in chords[2:]]
+    local_intensities_subset = []
+
+    relative_intensity = 0.0
+    relative_intensity_max = 0.0
+    
+    for local_intensity in local_intensities:
+        local_intensities_subset.append(local_intensity)
+        relative_intensity += local_intensity
+
+        if len(local_intensities_subset) > sample_size:
+            relative_intensity -= local_intensities_subset.pop(0)
+        
+        if relative_intensity > relative_intensity_max:
+            relative_intensity_max = relative_intensity
+
+    # Make chart intensity agnostic with respect to the rock meter size
+    chart_intensity = relative_intensity_max / sample_size
+
+    print_name(chart.name, is_last)
+    print_stat('avg vel', f'{avg_vel:.2f} n/s', is_last, False)
+    print_stat('avg abs acc', f'{avg_abs_acc:.2f} n/s^2', is_last, False)
+    print_stat('avg LH actions', f'{avg_lh_actions:.2f}', is_last, False)
+    print_stat('avg anchor count', f'{avg_anch:.2f}', is_last, False)
+    print_stat('intensity', f'{chart_intensity:.2f}', is_last, True)
+
+
+def calculate_all_chart_stats(charts: List[Type[Chart]]):
+    print('CHART STATISTICS')
+    for i, chart in enumerate(charts):
+        prepare_chart_for_stat_collection(chart)
+        calculate_chart_stats(chart, i == len(charts) - 1)
