@@ -4,6 +4,7 @@ from data import *
 
 def main():
     charts = [
+        DARKNESS_RIFF,
         INTRO_A_PUNK,
         MACHINATIONS_A,
         THEYRE_HAMMER_ONS,

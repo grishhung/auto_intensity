@@ -150,6 +150,54 @@ SANITY_ANCHOR_YGYG = Chart("Sanity Anchor (YGYG)", Diff.EXPERT, [
 ])
 
 
+# One, Darkness Riff
+DARKNESS_RIFF = Chart('Darkness Riff', Diff.EXPERT, [
+    # 1.1
+    Chord(0.000, 0b_00001_0, Forcing.STRUM),
+    Chord(0.090, 0b_00001_0, Forcing.STRUM),
+    Chord(0.181, 0b_00001_0, Forcing.STRUM),
+    Chord(0.272, 0b_00001_0, Forcing.STRUM),
+    Chord(0.363, 0b_00001_0, Forcing.STRUM),
+    Chord(0.454, 0b_00001_0, Forcing.STRUM),
+
+    # 1.2
+    Chord(0.545, 0b_00101_0, Forcing.STRUM),
+    
+    # 1.3
+    Chord(1.090, 0b_00001_0, Forcing.STRUM),
+    Chord(1.181, 0b_00001_0, Forcing.STRUM),
+    Chord(1.272, 0b_00001_0, Forcing.STRUM),
+    Chord(1.363, 0b_00001_0, Forcing.STRUM),
+    Chord(1.454, 0b_00001_0, Forcing.STRUM),
+    Chord(1.545, 0b_00001_0, Forcing.STRUM),
+
+    # 1.4
+    Chord(1.636, 0b_00101_0, Forcing.STRUM),
+
+    # 2.1
+    Chord(2.181, 0b_00001_0, Forcing.STRUM),
+    Chord(2.272, 0b_00001_0, Forcing.STRUM),
+    Chord(2.363, 0b_00001_0, Forcing.STRUM),
+    Chord(2.454, 0b_00001_0, Forcing.STRUM),
+    Chord(2.545, 0b_00001_0, Forcing.STRUM),
+    Chord(2.636, 0b_00001_0, Forcing.STRUM),
+
+    # 2.2
+    Chord(2.727, 0b_00101_0, Forcing.STRUM),
+
+    # 2.3
+    Chord(3.272, 0b_00001_0, Forcing.STRUM),
+    Chord(3.363, 0b_00001_0, Forcing.STRUM),
+    Chord(3.454, 0b_00001_0, Forcing.STRUM),
+    Chord(3.545, 0b_00001_0, Forcing.STRUM),
+    Chord(3.636, 0b_00001_0, Forcing.STRUM),
+    Chord(3.727, 0b_00001_0, Forcing.STRUM),
+
+    # 2.4
+    Chord(3.818, 0b_00101_0, Forcing.STRUM),
+])
+
+
 # A Punk, Intro - 1.1.000 to 11.1.000
 INTRO_A_PUNK = Chart('Intro (A Punk)', Diff.EXPERT, [
     # 1.1
