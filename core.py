@@ -1,9 +1,10 @@
 from chart import Chart
 from chord import Chord
-from constants import DIFF_TO_ROCK_METER_SIZE
+from constants import *
 from enums import Diff, Forcing
 from typing import Any, List, Dict, Type, TypeAlias
 
+import math
 
 def set_vels(chords: List[Type[Chord]]) -> None:
     for i, chord in enumerate(chords):
@@ -69,39 +70,46 @@ def prepare_chart_for_stat_collection(chart: Type[Chart]) -> None:
 def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
     chords = chart.chords
     n = len(chords)
-
+    
     avg_vel = sum([c.vel for c in chords[1:]]) / (n - 1)
     avg_abs_acc = sum([abs(c.acc) for c in chords[2:]]) / (n - 2)
     avg_lh_actions = sum([c.lh_actions for c in chords[1:]]) / (n - 1)
     avg_anch = sum([c.anchored_count for c in chords[1:]]) / (n - 1)
 
     # 0.8 times the rock meter size based on equilibrium of player who is competent enough
-    sample_size = 4 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 5;
+    sample_size = max(1, min(n - 1, 4 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 5));
 
     local_intensities = [chord.get_intensity() for chord in chords[2:]]
     local_intensities_subset = []
 
     relative_intensity = 0.0
-    relative_intensity_max = 0.0
+    relative_intensity_max = 1.0
+    running_intensity = 0.0
     
     for local_intensity in local_intensities:
         local_intensities_subset.append(local_intensity)
         relative_intensity += local_intensity
+        running_intensity += local_intensity
+
+        endurance_factor = math.pow(running_intensity, ENDURANCE_CURVE)
 
         if len(local_intensities_subset) > sample_size:
             relative_intensity -= local_intensities_subset.pop(0)
-        
-        if relative_intensity > relative_intensity_max:
-            relative_intensity_max = relative_intensity
+
+        adjusted_relative_intensity = relative_intensity * endurance_factor
+
+        if adjusted_relative_intensity > relative_intensity_max:
+            relative_intensity_max = adjusted_relative_intensity
 
     # Make chart intensity agnostic with respect to the rock meter size
-    chart_intensity = relative_intensity_max / sample_size
+    chart_intensity = math.log(relative_intensity_max / sample_size, CURVE_LOG_BASE)
 
     print_name(chart.name, is_last)
+    print_stat('note count', f'{n:.2f} n', is_last, False)
     print_stat('avg vel', f'{avg_vel:.2f} n/s', is_last, False)
-    print_stat('avg abs acc', f'{avg_abs_acc:.2f} n/s^2', is_last, False)
-    print_stat('avg LH actions', f'{avg_lh_actions:.2f}', is_last, False)
-    print_stat('avg anchor count', f'{avg_anch:.2f}', is_last, False)
+    #print_stat('avg abs acc', f'{avg_abs_acc:.2f} n/s^2', is_last, False)
+    #print_stat('avg LH actions', f'{avg_lh_actions:.2f}', is_last, False)
+    #print_stat('avg anchor count', f'{avg_anch:.2f}', is_last, False)
     print_stat('intensity', f'{chart_intensity:.2f}', is_last, True)
 
 

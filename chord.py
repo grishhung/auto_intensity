@@ -58,12 +58,12 @@ class Chord:
 
     def set_presses(self, prev_shape: Shape) -> None:
         """Return frets pressed in the current shape, but not the previous"""
-        self.presses = self.shape & ~prev_shape
+        self.presses = (self.shape >> 1) & ~(prev_shape >> 1)
 
 
     def set_lifts(self, prev_shape: Shape) -> None:
         """Return frets pressed in the previous shape, but not the current"""
-        self.lifts = prev_shape & ~self.shape
+        self.lifts = (prev_shape >> 1) & ~(self.shape >> 1)
 
 
     def set_lh_actions(self) -> None:
@@ -73,6 +73,7 @@ class Chord:
 
     def get_intensity(self) -> float:
         """Local intensity of the current chord"""
-        local_intensity = self.vel * (self.lh_actions + self.rh_actions)
-        return GLOBAL_COEFF * math.log(1.0 + local_intensity / CURVE_LEN_COEFF,
-                CURVE_LOG_BASE)
+        # Each note requires at least one action
+        # Floor of a note's intensity is 1 (1 action per second; a refretting + strum takes 3 actions)
+        local_intensity = max(1, self.vel * max(1, self.lh_actions + self.rh_actions))
+        return local_intensity
