@@ -75,8 +75,8 @@ def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
     avg_lh_actions = sum([c.lh_actions for c in chords[1:]]) / (n - 1)
     avg_anch = sum([c.anchored_count for c in chords[1:]]) / (n - 1)
 
-    # Half the rock meter size since the middle is the average state
-    sample_size = DIFF_TO_ROCK_METER_SIZE[chart.diff] // 2
+    # 0.8 times the rock meter size based on equilibrium of player who is competent enough
+    sample_size = 4 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 5;
 
     local_intensities = [chord.get_intensity() for chord in chords[2:]]
     local_intensities_subset = []
