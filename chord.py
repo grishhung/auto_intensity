@@ -16,6 +16,7 @@ class Chord:
 
     presses: Shape = None           # New frets that WERE NOT in the last
     lifts: Shape = None             # Absent frets that WERE in the last
+    holds: Shape = None             # Present frets that WERE in the last, or NONE if identical
     lh_actions: int = None          # All possible LH actions per the chart
     rh_actions: int = None          # Number of RH actions
 
@@ -60,15 +61,20 @@ class Chord:
         """Return frets pressed in the current shape, but not the previous"""
         self.presses = (self.shape >> 1) & ~(prev_shape >> 1)
 
-
     def set_lifts(self, prev_shape: Shape) -> None:
         """Return frets pressed in the previous shape, but not the current"""
         self.lifts = (prev_shape >> 1) & ~(self.shape >> 1)
 
+    def set_holds(self, prev_shape: Shape) -> None:
+        """Return frets pressed in the current shape and the previous shape, but none if identical"""
+        if self.shape == prev_shape:
+            self.holds = 0b_00000
+        else:
+            self.holds = (self.shape >> 1) & (prev_shape >> 1)
 
     def set_lh_actions(self) -> None:
         # Composite of presses and lifts
-        self.lh_actions = count_frets(self.presses) + count_frets(self.lifts)
+        self.lh_actions = count_frets(self.presses) + count_frets(self.lifts) + count_frets(self.holds)
 
 
     def get_intensity(self) -> float:

@@ -35,6 +35,7 @@ def set_lh_actions(chords: List[Type[Chord]]) -> None:
             curr_shape = chord.shape
             chord.set_presses(prev_shape)
             chord.set_lifts(prev_shape)
+            chord.set_holds(prev_shape)
             chord.set_lh_actions()
 
 
@@ -77,7 +78,7 @@ def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
     avg_anch = sum([c.anchored_count for c in chords[1:]]) / (n - 1)
 
     # 0.8 times the rock meter size based on equilibrium of player who is competent enough
-    sample_size = max(1, min(n - 1, 4 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 5));
+    sample_size = max(1, min(n - 2, 4 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 5));
 
     local_intensities = [chord.get_intensity() for chord in chords[2:]]
     local_intensities_subset = []
