@@ -74,7 +74,14 @@ class Chord:
 
     def set_lh_actions(self) -> None:
         # Composite of presses and lifts
-        self.lh_actions = count_frets(self.presses) + count_frets(self.lifts) + count_frets(self.holds)
+        # Consider a sequence of chords differing by 1 note each time
+        # Score of each transition = size of largest chord in the transition
+        # Formula = least possible total score
+        # Example: GY to RB is GY -> G -> P -> R -> RB, 2+1+1+2 = 6
+        A = count_frets(self.presses)
+        B = count_frets(self.lifts)
+        C = count_frets(self.holds)
+        self.lh_actions = C * (A + B) + A * (A+1) // 2 + B * (B+1) // 2
 
 
     def get_intensity(self) -> float:

@@ -2,11 +2,11 @@ from typing import Dict
 from enums import *
 
 GLOBAL_COEFF = 1.4
-CURVE_LOG_BASE = 1.5
+CURVE_FINAL_MULT = 3.2 # Curve so that scale is 0.0-15.5/20.0 for setlist/customs 
 CURVE_LEN_COEFF = 5
 
-# Based on assumption: cumulative intensity of 10000 = multiplier of 1.5 
-ENDURANCE_CURVE = 0.045
+# Based on assumption: playing same song twice = ? increase in difficulty 
+ENDURANCE_CURVE = 0.0
 
 # Based on whether a strum is required
 FORCING_TO_RH_ACTIONS: Dict[Forcing, int] = {

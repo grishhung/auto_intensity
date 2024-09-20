@@ -67,6 +67,25 @@ def prepare_chart_for_stat_collection(chart: Type[Chart]) -> None:
     set_anchored_shapes_and_counts(chords)
     set_lh_actions(chords)
 
+def find_min_pass_intensity(intensities, meter, start):
+    left = 1
+    right = max(intensities)
+    while right - left > 0.005:
+        capability = (left + right) / 2
+        meter_level = start
+        chart_passed = True
+        for intensity in intensities:
+            expected_change = 1.25 * min(capability / intensity, 1) - 1
+            meter_level = min(meter, meter_level+expected_change)
+            if meter_level < 0:
+                chart_passed = False
+                break
+        if chart_passed:
+            right = capability
+        else:
+            left = capability
+    return right
+
 
 def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
     chords = chart.chords
@@ -77,16 +96,19 @@ def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
     avg_lh_actions = sum([c.lh_actions for c in chords[1:]]) / (n - 1)
     avg_anch = sum([c.anchored_count for c in chords[1:]]) / (n - 1)
 
-    # 0.8 times the rock meter size based on equilibrium of player who is competent enough
-    sample_size = max(1, min(n - 2, 4 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 5));
-
     local_intensities = [chord.get_intensity() for chord in chords[2:]]
     local_intensities_subset = []
+
+    tweaked_local_intensities = [math.cbrt(local_intensities[i]*local_intensities[i+1]*local_intensities[i+1]) for i in range(len(local_intensities)-1)]
+
+    '''
+    # 0.8 times the rock meter size based on equilibrium of player who is competent enough
+    sample_size = max(1, min(n - 2, 4 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 5));
 
     relative_intensity = 0.0
     relative_intensity_max = 1.0
     running_intensity = 0.0
-    
+
     for local_intensity in local_intensities:
         local_intensities_subset.append(local_intensity)
         relative_intensity += local_intensity
@@ -101,9 +123,13 @@ def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
 
         if adjusted_relative_intensity > relative_intensity_max:
             relative_intensity_max = adjusted_relative_intensity
+    '''
+
+    min_pass_intensity = find_min_pass_intensity(tweaked_local_intensities, DIFF_TO_ROCK_METER_SIZE[chart.diff], 5 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 6)
 
     # Make chart intensity agnostic with respect to the rock meter size
-    chart_intensity = math.log(relative_intensity_max / sample_size, CURVE_LOG_BASE)
+    # chart_intensity = CURVE_FINAL_MULT * math.log(relative_intensity_max / sample_size, 2)
+    chart_intensity = CURVE_FINAL_MULT * math.log(min_pass_intensity, 2)
 
     print_name(chart.name, is_last)
     print_stat('note count', f'{n:.2f} n', is_last, False)
