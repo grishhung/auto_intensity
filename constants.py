@@ -2,7 +2,7 @@ from typing import Dict
 from enums import *
 
 GLOBAL_COEFF = 1.4
-CURVE_FINAL_MULT = 3.2 # Curve so that scale is 0.0-15.5/20.0 for setlist/customs 
+CURVE_FINAL_MULT = 3.1 # Curve so that scale is 0.0-15.0/20.0 for setlist/customs 
 CURVE_LEN_COEFF = 5
 
 # Based on assumption: playing same song twice = ? increase in difficulty 

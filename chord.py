@@ -11,13 +11,15 @@ class Chord:
     shape: float = None             # Bitwise; 0b_00011_0 = GR; 0b_00000_1 = P
     forcing: Type[Forcing] = None   # Strum, HOPO, or tap
 
-    vel: float = None               # Reciprocal of delta time
+    lh_vel: list[float] = []        # Reciprocals of delta time from previous distinct chords
+    rh_vel: list[float] = []        # Reciprocals of delta time from previous strummed chords
+    vel: float = None               # Reciprocal of delta time from previous chord
     acc: float = None               # Acceleration by delta velocity
 
     presses: Shape = None           # New frets that WERE NOT in the last
     lifts: Shape = None             # Absent frets that WERE in the last
     holds: Shape = None             # Present frets that WERE in the last, or NONE if identical
-    lh_actions: int = None          # All possible LH actions per the chart
+    lh_actions: list[int] = None    # Number of LH actions relative to previous distinct chords
     rh_actions: int = None          # Number of RH actions
 
     anchorable_shape: Shape = None  # SHAPE that you're ALLOWED to anchor
@@ -32,7 +34,6 @@ class Chord:
         self.time = time
         self.shape = shape
         self.forcing = forcing
-        self.rh_actions = FORCING_TO_RH_ACTIONS[forcing]
 
         # If a single B (0b_01000_0), then all frets under + open (0b_00111_1)
         self.anchorable_shape = shape - 1 if self.is_single_note() else shape
@@ -44,8 +45,16 @@ class Chord:
         return shape > 0 and (shape & (shape - 1)) == 0
 
 
+    def set_lh_vel(self, prev_times: list[float]) -> None:
+        self.lh_vel = [1 / (self.time - prev_time) for prev_time in prev_times]
+
+
+    def set_rh_vel(self, prev_times: list[float]) -> None:
+        self.rh_vel = [1 / (self.time - prev_time) for prev_time in prev_times]
+
+
     def set_vel(self, prev_time: float) -> None:
-        self.vel = 1 / (self.time - prev_time);
+        self.vel = 1 / (self.time - prev_time)
 
 
     def set_acc(self, prev_vel: float) -> None:
@@ -57,36 +66,34 @@ class Chord:
         self.anchored_count = count_frets(self.anchored_shape)
 
 
-    def set_presses(self, prev_shape: Shape) -> None:
+    def set_presses(self, prev_shapes: list[Shape]) -> None:
         """Return frets pressed in the current shape, but not the previous"""
-        self.presses = (self.shape >> 1) & ~(prev_shape >> 1)
+        self.presses = [(self.shape >> 1) & ~(prev_shape >> 1) for prev_shape in prev_shapes]
 
-    def set_lifts(self, prev_shape: Shape) -> None:
+
+    def set_lifts(self, prev_shapes: list[Shape]) -> None:
         """Return frets pressed in the previous shape, but not the current"""
-        self.lifts = (prev_shape >> 1) & ~(self.shape >> 1)
+        self.lifts = [(prev_shape >> 1) & ~(self.shape >> 1) for prev_shape in prev_shapes]
 
-    def set_holds(self, prev_shape: Shape) -> None:
-        """Return frets pressed in the current shape and the previous shape, but none if identical"""
-        if self.shape == prev_shape:
-            self.holds = 0b_00000
-        else:
-            self.holds = (self.shape >> 1) & (prev_shape >> 1)
 
     def set_lh_actions(self) -> None:
         # Composite of presses and lifts
-        # Consider a sequence of chords differing by 1 note each time
-        # Score of each transition = size of largest chord in the transition
-        # Formula = least possible total score
-        # Example: GY to RB is GY -> G -> P -> R -> RB, 2+1+1+2 = 6
-        A = count_frets(self.presses)
-        B = count_frets(self.lifts)
-        C = count_frets(self.holds)
-        self.lh_actions = C * (A + B) + A * (A+1) // 2 + B * (B+1) // 2
+        self.lh_actions = [count_frets(self.lifts[i]) + count_frets(self.presses[i]) for i in range(len(self.lifts))]
+
+
+    def set_rh_actions(self, prev_shape: Shape) -> None:
+        # 1 if a strum or identical shape to previous chord
+        self.rh_actions = FORCING_TO_RH_ACTIONS[self.forcing] or (prev_shape == self.shape)
 
 
     def get_intensity(self) -> float:
         """Local intensity of the current chord"""
-        # Each note requires at least one action
+        lh_intensity = sum([self.lh_vel[i] * self.lh_actions[i] for i in range(len(self.lh_vel))])
+        rh_intensity = sum(self.rh_vel) * self.rh_actions
+        
+        # Expected contribution of the chord n previous is 1/n, readjust sum accordingly
+        note_lookback_factor = 1 / sum([1 / i for i in range(1, len(self.lh_vel) + 1)])
+        
         # Floor of a note's intensity is 1 (1 action per second; a refretting + strum takes 3 actions)
-        local_intensity = max(1, self.vel * max(1, self.lh_actions + self.rh_actions))
+        local_intensity = max(1, note_lookback_factor * (lh_intensity + rh_intensity))
         return local_intensity

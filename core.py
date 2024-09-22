@@ -27,16 +27,36 @@ def set_accs(chords: List[Type[Chord]]) -> None:
 
 
 def set_lh_actions(chords: List[Type[Chord]]) -> None:
+    fretting_indices = [0,0]
     for i, chord in enumerate(chords):
         if i < 1:
             chord.lh_complexity = 0.0
         else:
-            prev_shape = chords[i - 1].shape
-            curr_shape = chord.shape
-            chord.set_presses(prev_shape)
-            chord.set_lifts(prev_shape)
-            chord.set_holds(prev_shape)
+            if chords[i - 1].shape != chord.shape:
+                fretting_indices.append(i - 1)
+                fretting_indices.pop(0)
+            prev_chords = [chords[fretting_indices[-1]], chords[fretting_indices[-2]]]
+            prev_shapes = [chord.shape for chord in prev_chords]
+            prev_times = [chord.time for chord in prev_chords]
+            chord.set_presses(prev_shapes)
+            chord.set_lifts(prev_shapes)
+            chord.set_lh_vel(prev_times)
             chord.set_lh_actions()
+
+
+def set_rh_actions(chords: List[Type[Chord]]) -> None:
+    strum_indices = [0,0]
+    for i, chord in enumerate(chords):
+        if i < 1:
+            chord.rh_complexity = 0.0
+        else:
+            prev_chords = [chords[strum_indices[-1]], chords[strum_indices[-2]]]
+            prev_times = [chord.time for chord in prev_chords]
+            chord.set_rh_vel(prev_times)
+            chord.set_rh_actions(chords[i - 1].shape)
+            if chord.rh_actions:
+                strum_indices.append(i)
+                strum_indices.pop(0)
 
 
 def set_anchored_shapes_and_counts(chords: List[Type[Chord]]) -> None:
@@ -66,8 +86,11 @@ def prepare_chart_for_stat_collection(chart: Type[Chart]) -> None:
     set_accs(chords)
     set_anchored_shapes_and_counts(chords)
     set_lh_actions(chords)
+    set_rh_actions(chords)
 
 def find_min_pass_intensity(intensities, meter, start):
+    if len(intensities) == 0:
+        return 1
     left = 1
     right = max(intensities)
     while right - left > 0.005:
@@ -90,11 +113,13 @@ def find_min_pass_intensity(intensities, meter, start):
 def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
     chords = chart.chords
     n = len(chords)
-    
+
+    '''
     avg_vel = sum([c.vel for c in chords[1:]]) / (n - 1)
     avg_abs_acc = sum([abs(c.acc) for c in chords[2:]]) / (n - 2)
     avg_lh_actions = sum([c.lh_actions for c in chords[1:]]) / (n - 1)
     avg_anch = sum([c.anchored_count for c in chords[1:]]) / (n - 1)
+    '''
 
     local_intensities = [chord.get_intensity() for chord in chords[2:]]
     local_intensities_subset = []
@@ -125,7 +150,7 @@ def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
             relative_intensity_max = adjusted_relative_intensity
     '''
 
-    min_pass_intensity = find_min_pass_intensity(tweaked_local_intensities, DIFF_TO_ROCK_METER_SIZE[chart.diff], 5 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 6)
+    min_pass_intensity = find_min_pass_intensity(local_intensities, DIFF_TO_ROCK_METER_SIZE[chart.diff], 5 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 6)
 
     # Make chart intensity agnostic with respect to the rock meter size
     # chart_intensity = CURVE_FINAL_MULT * math.log(relative_intensity_max / sample_size, 2)
@@ -133,7 +158,7 @@ def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
 
     print_name(chart.name, is_last)
     print_stat('note count', f'{n:.2f} n', is_last, False)
-    print_stat('avg vel', f'{avg_vel:.2f} n/s', is_last, False)
+    #print_stat('avg vel', f'{avg_vel:.2f} n/s', is_last, False)
     #print_stat('avg abs acc', f'{avg_abs_acc:.2f} n/s^2', is_last, False)
     #print_stat('avg LH actions', f'{avg_lh_actions:.2f}', is_last, False)
     #print_stat('avg anchor count', f'{avg_anch:.2f}', is_last, False)
