@@ -42,6 +42,7 @@ class Chart:
         previous_tick = 0
         current_chord = 0b_00000_0
         active_mods = []
+        active_lanes = []
         mid_to_note = MID_TO_NOTE[self.diff]
         mid_to_mod = MID_TO_MOD[self.diff]
         for msg in track:
@@ -57,12 +58,17 @@ class Chart:
             
             if msg.type not in ['note_on', 'note_off']:
                 continue
-            if (msg.note in mid_to_mod.keys()):
+            if msg.note in mid_to_mod.keys():
                 if msg.type == 'note_on':
                     active_mods.append(msg.note)
                 elif msg.type == 'note_off':
                     active_mods.remove(msg.note)
                 continue
+            if msg.note in MID_TO_LANES:
+                if msg.type == 'note_on':
+                    active_lanes.append(msg.note)
+                elif msg.type == 'note_off':
+                    active_lanes.remove(msg.note)
             if msg.note not in mid_to_note.keys():
                 continue
             
@@ -74,7 +80,10 @@ class Chart:
                             forcing = Forcing.HOPO
                         if len(active_mods) > 0:
                             forcing = mid_to_mod[max(active_mods)]
-                        chord = Chord(previous_time, current_chord, forcing)
+                        laned = False
+                        if len(active_lanes) > 0:
+                            laned = True
+                        chord = Chord(previous_time, current_chord, forcing, laned)
                         self.add_chord(chord)
                         current_chord = 0b_00000_0
                     previous_tick = current_tick

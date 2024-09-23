@@ -1,18 +1,9 @@
 from core import *
-from data import *
 
 from glob import glob
 
 def main():
-    charts = [
-        INTRO_A_PUNK,
-        MACHINATIONS_A,
-        THEYRE_HAMMER_ONS,
-        SANITY_SWING,
-        SANITY_ANCHOR_YGYR,
-        SANITY_ANCHOR_YGYG,
-    ]
-
+    
     directory = input('Enter directory path to charts:\n')
 
     for filename in glob(directory + '/**/notes.mid', recursive=True):

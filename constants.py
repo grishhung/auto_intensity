@@ -1,9 +1,11 @@
-from typing import Dict
+from typing import Dict, List
 from enums import *
 
 GLOBAL_COEFF = 1.4
 CURVE_FINAL_MULT = 3.1 # Curve so that scale is 0.0-15.0/20.0 for setlist/customs 
 CURVE_LEN_COEFF = 5
+HIT_WINDOW_SIZE = 0.14 # Based on default engine
+MIN_CAPABILITY = 0.8 # Least capability with intensity to pass intensity 1 chords
 
 # Based on assumption: playing same song twice = ? increase in difficulty 
 ENDURANCE_CURVE = 0.0
@@ -23,7 +25,7 @@ DIFF_TO_ROCK_METER_SIZE: Dict[Diff, int] = {
     Diff.EXPERT: 42 # 50
 }
 
-# MIDI to notes and markers
+# MIDI to notes
 MID_TO_NOTE: Dict[Diff, Dict[int, int]] = {
     Diff.EASY: {
         59: 0b_00000_1,
@@ -59,6 +61,7 @@ MID_TO_NOTE: Dict[Diff, Dict[int, int]] = {
     }
 }
 
+# MIDI to markers
 MID_TO_MOD: Dict[Diff, Dict[int, Forcing]] = {
     Diff.EASY: {
         65: Forcing.HOPO,
@@ -81,3 +84,6 @@ MID_TO_MOD: Dict[Diff, Dict[int, Forcing]] = {
         104: Forcing.TAP
     }
 }
+
+# MIDI to lanes
+MID_TO_LANES: List[int] = [126, 127]

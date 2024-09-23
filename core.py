@@ -26,6 +26,37 @@ def set_accs(chords: List[Type[Chord]]) -> None:
             chord.set_acc(chords[i - 1].vel)
 
 
+def set_leniencies(chords: List[Type[Chord]]) -> None:
+    for i, chord in enumerate(chords):
+        radius = HIT_WINDOW_SIZE / 2
+        if i < 1:
+            chord.set_leniency(0.0)
+        elif i < 2:
+            chord.set_leniency(radius)
+        else:
+            right = chord.time + radius
+            left = chord.time - radius
+            j = i-1
+            delta = 1
+            leniency = 0.0
+            while (j > 0) or (i - j < 21):
+                left = chords[j].time - radius
+                delta = (right - left) / (i - j)
+                spot = right - (j+1) * delta
+                target_left = chords[i-j-1].time - radius
+                target_right = chords[i-j-1].time + radius
+                if spot < target_left:
+                    leniency = 0.0
+                    break
+                elif spot > target_right:
+                    leniency = delta
+                    break
+                j -= 1
+            if (leniency == 0) and (j == 0):
+                leninecy = delta
+            chord.set_leniency(leniency)
+
+
 def set_lh_actions(chords: List[Type[Chord]]) -> None:
     fretting_indices = [0,0]
     for i, chord in enumerate(chords):
@@ -84,21 +115,22 @@ def prepare_chart_for_stat_collection(chart: Type[Chart]) -> None:
 
     set_vels(chords)
     set_accs(chords)
+    set_leniencies(chords)
     set_anchored_shapes_and_counts(chords)
     set_lh_actions(chords)
     set_rh_actions(chords)
 
-def find_min_pass_intensity(intensities, meter, start):
+def find_min_pass_intensity(intensities, strums, meter, start):
     if len(intensities) == 0:
-        return 1
-    left = 1
+        return MIN_CAPABILITY
+    left = MIN_CAPABILITY
     right = max(intensities)
     while right - left > 0.005:
         capability = (left + right) / 2
         meter_level = start
         chart_passed = True
-        for intensity in intensities:
-            expected_change = 1.25 * min(capability / intensity, 1) - 1
+        for i, intensity in enumerate(intensities):
+            expected_change = (1.25 + strums[i] / intensity) * min(capability / intensity, 1) - (1 + strums[i] / intensity)
             meter_level = min(meter, meter_level+expected_change)
             if meter_level < 0:
                 chart_passed = False
@@ -121,7 +153,8 @@ def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
     avg_anch = sum([c.anchored_count for c in chords[1:]]) / (n - 1)
     '''
 
-    local_intensities = [chord.get_intensity() for chord in chords[2:]]
+    local_intensities = [chord.get_intensity() for chord in chords[1:]]
+    strums = [chord.rh_actions for chord in chords[1:]]
     local_intensities_subset = []
 
     tweaked_local_intensities = [math.cbrt(local_intensities[i]*local_intensities[i+1]*local_intensities[i+1]) for i in range(len(local_intensities)-1)]
@@ -150,11 +183,11 @@ def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
             relative_intensity_max = adjusted_relative_intensity
     '''
 
-    min_pass_intensity = find_min_pass_intensity(local_intensities, DIFF_TO_ROCK_METER_SIZE[chart.diff], 5 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 6)
+    min_pass_intensity = find_min_pass_intensity(local_intensities, strums, DIFF_TO_ROCK_METER_SIZE[chart.diff], 5 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 6)
 
     # Make chart intensity agnostic with respect to the rock meter size
     # chart_intensity = CURVE_FINAL_MULT * math.log(relative_intensity_max / sample_size, 2)
-    chart_intensity = CURVE_FINAL_MULT * math.log(min_pass_intensity, 2)
+    chart_intensity = CURVE_FINAL_MULT * math.log(min_pass_intensity / MIN_CAPABILITY, 2)
 
     print_name(chart.name, is_last)
     print_stat('note count', f'{n:.2f} n', is_last, False)

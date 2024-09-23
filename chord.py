@@ -2,7 +2,7 @@ import math
 
 from constants import *
 from enums import Diff, Forcing
-from typing import Dict, Type
+from typing import Dict, Type, List
 from utils import *
 
 
@@ -10,16 +10,18 @@ class Chord:
     time: float = None              # The timestamp of the chord, NOT length
     shape: float = None             # Bitwise; 0b_00011_0 = GR; 0b_00000_1 = P
     forcing: Type[Forcing] = None   # Strum, HOPO, or tap
+    laned: bool = None              # Whether this note is in a lane
 
-    lh_vel: list[float] = []        # Reciprocals of delta time from previous distinct chords
-    rh_vel: list[float] = []        # Reciprocals of delta time from previous strummed chords
+    leniency: float = None          # Extra amount of time allowed by 140ms hit window based on previous notes
+    lh_vel: List[float] = []        # Reciprocals of delta time from previous distinct chords (includes leniency)
+    rh_vel: List[float] = []        # Reciprocals of delta time from previous strummed chords (includes leniency)
     vel: float = None               # Reciprocal of delta time from previous chord
     acc: float = None               # Acceleration by delta velocity
 
     presses: Shape = None           # New frets that WERE NOT in the last
     lifts: Shape = None             # Absent frets that WERE in the last
     holds: Shape = None             # Present frets that WERE in the last, or NONE if identical
-    lh_actions: list[int] = None    # Number of LH actions relative to previous distinct chords
+    lh_actions: List[int] = None    # Number of LH actions relative to previous distinct chords
     rh_actions: int = None          # Number of RH actions
 
     anchorable_shape: Shape = None  # SHAPE that you're ALLOWED to anchor
@@ -30,10 +32,11 @@ class Chord:
     rh_complexity: float = None     # Composite strumming complexity
 
 
-    def __init__(self, time: float, shape: Shape, forcing: Type[Forcing]):
+    def __init__(self, time: float, shape: Shape, forcing: Type[Forcing], laned: bool):
         self.time = time
         self.shape = shape
         self.forcing = forcing
+        self.laned = laned
 
         # If a single B (0b_01000_0), then all frets under + open (0b_00111_1)
         self.anchorable_shape = shape - 1 if self.is_single_note() else shape
@@ -44,13 +47,18 @@ class Chord:
         shape = self.shape
         return shape > 0 and (shape & (shape - 1)) == 0
 
+    def set_leniency(self, leniency: float):
+        self.leniency = leniency
 
-    def set_lh_vel(self, prev_times: list[float]) -> None:
-        self.lh_vel = [1 / (self.time - prev_time) for prev_time in prev_times]
+
+    def set_lh_vel(self, prev_times: List[float]) -> None:
+        lane_multiplier = 1 + self.laned
+        self.lh_vel = [1 / (lane_multiplier * (self.time - prev_time) + self.leniency) for prev_time in prev_times]
 
 
-    def set_rh_vel(self, prev_times: list[float]) -> None:
-        self.rh_vel = [1 / (self.time - prev_time) for prev_time in prev_times]
+    def set_rh_vel(self, prev_times: List[float]) -> None:
+        lane_multiplier = 1 + self.laned
+        self.rh_vel = [1 / (lane_multiplier * (self.time - prev_time) + self.leniency) for prev_time in prev_times]
 
 
     def set_vel(self, prev_time: float) -> None:
@@ -66,12 +74,12 @@ class Chord:
         self.anchored_count = count_frets(self.anchored_shape)
 
 
-    def set_presses(self, prev_shapes: list[Shape]) -> None:
+    def set_presses(self, prev_shapes: List[Shape]) -> None:
         """Return frets pressed in the current shape, but not the previous"""
         self.presses = [(self.shape >> 1) & ~(prev_shape >> 1) for prev_shape in prev_shapes]
 
 
-    def set_lifts(self, prev_shapes: list[Shape]) -> None:
+    def set_lifts(self, prev_shapes: List[Shape]) -> None:
         """Return frets pressed in the previous shape, but not the current"""
         self.lifts = [(prev_shape >> 1) & ~(self.shape >> 1) for prev_shape in prev_shapes]
 
