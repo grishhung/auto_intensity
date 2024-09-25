@@ -27,33 +27,37 @@ def set_accs(chords: List[Type[Chord]]) -> None:
 
 
 def set_leniencies(chords: List[Type[Chord]]) -> None:
+    radius = HIT_WINDOW_SIZE / 2
+    strum_factor = radius - STRUM_NOTE_LENIENCY
     for i, chord in enumerate(chords):
-        radius = HIT_WINDOW_SIZE / 2
         if i < 1:
             chord.set_leniency(0.0)
         elif i < 2:
-            chord.set_leniency(radius)
+            chord.set_leniency(2 * radius - strum_factor * chords[i-1].rh_actions)
         else:
-            right = chord.time + radius
-            left = chord.time - radius
-            j = i-1
-            delta = 1
-            leniency = 0.0
-            while (j > 0) or (i - j < 21):
-                left = chords[j].time - radius
-                delta = (right - left) / (i - j)
-                spot = right - (j+1) * delta
-                target_left = chords[i-j-1].time - radius
-                target_right = chords[i-j-1].time + radius
-                if spot < target_left:
-                    leniency = 0.0
+            diff = chord.time - chords[i-1].time
+            lower_bound = diff
+            upper_bound = diff + 2 * radius - strum_factor * chords[i-1].rh_actions
+            j = i-2
+            leniency = -1
+            while (j > 0) and (upper_bound - lower_bound > HIT_WINDOW_NOISE):
+                new_lower = (chord.time - chords[j].time) / (i - j)
+                new_upper = (chord.time - chords[j].time + 2 * radius - strum_factor * chords[j].rh_actions) / (i - j)
+                if new_lower > upper_bound:
+                    leniency = upper_bound
                     break
-                elif spot > target_right:
-                    leniency = delta
+                if new_upper < lower_bound:
+                    leniency = lower_bound
                     break
+                upper_bound = min(upper_bound, new_upper)
+                lower_bound = max(lower_bound, new_lower)
                 j -= 1
-            if (leniency == 0) and (j == 0):
-                leninecy = delta
+            if leniency < 0:
+                if j == 0:
+                    leniency = upper_bound
+                else:
+                    leniency = lower_bound
+            leniency -= diff
             chord.set_leniency(leniency)
 
 
@@ -80,11 +84,30 @@ def set_rh_actions(chords: List[Type[Chord]]) -> None:
     for i, chord in enumerate(chords):
         if i < 1:
             chord.rh_complexity = 0.0
+            chord.rh_actions = 1
+            chord.overstrum_prob = 1
+        else:
+            prev_chords = [chords[strum_indices[-1]], chords[strum_indices[-2]]]
+            prev_times = [chord.time for chord in prev_chords]
+            chord.set_rh_actions(chords[i - 1].shape)
+            if i == len(chords) - 1:
+                chord.overstrum_prob = chord.rh_actions
+            else:
+                chord.set_overstrum_prob(chords[i + 1].shape, chords[i + 1].time)
+            if chord.rh_actions:
+                strum_indices.append(i)
+                strum_indices.pop(0)
+
+
+def set_rh_vels(chords: List[Type[Chord]]) -> None:
+    strum_indices = [0,0]
+    for i, chord in enumerate(chords):
+        if i < 1:
+            chord.rh_complexity = 0.0
         else:
             prev_chords = [chords[strum_indices[-1]], chords[strum_indices[-2]]]
             prev_times = [chord.time for chord in prev_chords]
             chord.set_rh_vel(prev_times)
-            chord.set_rh_actions(chords[i - 1].shape)
             if chord.rh_actions:
                 strum_indices.append(i)
                 strum_indices.pop(0)
@@ -115,12 +138,13 @@ def prepare_chart_for_stat_collection(chart: Type[Chart]) -> None:
 
     set_vels(chords)
     set_accs(chords)
-    set_leniencies(chords)
     set_anchored_shapes_and_counts(chords)
-    set_lh_actions(chords)
     set_rh_actions(chords)
+    set_leniencies(chords)
+    set_rh_vels(chords)
+    set_lh_actions(chords)
 
-def find_min_pass_intensity(intensities, strums, meter, start):
+def find_min_pass_intensity(intensities, strums, overstrum_probs, meter, start):
     if len(intensities) == 0:
         return MIN_CAPABILITY
     left = MIN_CAPABILITY
@@ -128,10 +152,30 @@ def find_min_pass_intensity(intensities, strums, meter, start):
     while right - left > 0.005:
         capability = (left + right) / 2
         meter_level = start
+        skill_heatsink_max = capability * SKILL_HEATSINK_MAX
+        skill_heatsink = skill_heatsink_max
         chart_passed = True
+        prev_hit_prob = 1
         for i, intensity in enumerate(intensities):
-            expected_change = (1.25 + strums[i] / intensity) * min(capability / intensity, 1) - (1 + strums[i] / intensity)
+            if skill_heatsink > 0:
+                skill_heatsink = min(skill_heatsink_max, skill_heatsink + capability - intensity)
+            else:
+                skill_heatsink = skill_heatsink + capability
+            if skill_heatsink > 0:
+                hit_prob = 1
+            else:
+                hit_prob = min(capability / intensity, 1)
+            overstrum_prob = overstrum_probs[i]
+            # To do: implement feature that taps don't need recovery
+            if strums[i]:
+                e_prev_hit = hit_prob * 0.25 - (1 - hit_prob) * (1 + overstrum_prob)
+                e_prev_miss = hit_prob * 0.25 - (1 - hit_prob) * (1 + overstrum_prob)
+            else:
+                e_prev_hit = hit_prob * 0.25 - (1 - hit_prob)
+                e_prev_miss = HOPO_RECOVERY * (hit_prob * 0.25 - (1 - hit_prob) * (1 + overstrum_prob)) - (1 - HOPO_RECOVERY)
+            expected_change = prev_hit_prob * e_prev_hit + (1 - prev_hit_prob) * e_prev_miss
             meter_level = min(meter, meter_level+expected_change)
+            prev_hit_prob = hit_prob
             if meter_level < 0:
                 chart_passed = False
                 break
@@ -155,39 +199,17 @@ def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
 
     local_intensities = [chord.get_intensity() for chord in chords[1:]]
     strums = [chord.rh_actions for chord in chords[1:]]
-    local_intensities_subset = []
+    overstrum_probs = [chord.overstrum_prob for chord in chords[1:]]
 
-    tweaked_local_intensities = [math.cbrt(local_intensities[i]*local_intensities[i+1]*local_intensities[i+1]) for i in range(len(local_intensities)-1)]
+    if False:
+        for i in range(len(chords[1:])):
+            print(chords[i].leniency)
 
-    '''
-    # 0.8 times the rock meter size based on equilibrium of player who is competent enough
-    sample_size = max(1, min(n - 2, 4 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 5));
-
-    relative_intensity = 0.0
-    relative_intensity_max = 1.0
-    running_intensity = 0.0
-
-    for local_intensity in local_intensities:
-        local_intensities_subset.append(local_intensity)
-        relative_intensity += local_intensity
-        running_intensity += local_intensity
-
-        endurance_factor = math.pow(running_intensity, ENDURANCE_CURVE)
-
-        if len(local_intensities_subset) > sample_size:
-            relative_intensity -= local_intensities_subset.pop(0)
-
-        adjusted_relative_intensity = relative_intensity * endurance_factor
-
-        if adjusted_relative_intensity > relative_intensity_max:
-            relative_intensity_max = adjusted_relative_intensity
-    '''
-
-    min_pass_intensity = find_min_pass_intensity(local_intensities, strums, DIFF_TO_ROCK_METER_SIZE[chart.diff], 5 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 6)
+    min_pass_intensity = find_min_pass_intensity(local_intensities, strums, overstrum_probs, DIFF_TO_ROCK_METER_SIZE[chart.diff], 5 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 6)
 
     # Make chart intensity agnostic with respect to the rock meter size
     # chart_intensity = CURVE_FINAL_MULT * math.log(relative_intensity_max / sample_size, 2)
-    chart_intensity = CURVE_FINAL_MULT * math.log(min_pass_intensity / MIN_CAPABILITY, 2)
+    chart_intensity = CURVE_FINAL_MULT * max(0, math.log(min_pass_intensity / MIN_CAPABILITY, 2))
 
     print_name(chart.name, is_last)
     print_stat('note count', f'{n:.2f} n', is_last, False)

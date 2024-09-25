@@ -76,7 +76,7 @@ class Chart:
                 if current_tick > previous_tick:
                     if current_chord != 0b_00000_0:
                         forcing = Forcing.STRUM
-                        if current_tick - previous_tick >= 170:
+                        if current_tick - previous_tick <= 17 * ticks_per_beat / 48:
                             forcing = Forcing.HOPO
                         if len(active_mods) > 0:
                             forcing = mid_to_mod[max(active_mods)]

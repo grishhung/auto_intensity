@@ -1,11 +1,33 @@
 from typing import Dict, List
 from enums import *
 
+# Curve so that 1.25x speed = intensity increased by 1 
+# This scale is 0.0-14.0/20.0 for setlist/customs
+CURVE_FINAL_MULT = 3.1 
+
 GLOBAL_COEFF = 1.4
-CURVE_FINAL_MULT = 3.1 # Curve so that scale is 0.0-15.0/20.0 for setlist/customs 
 CURVE_LEN_COEFF = 5
-HIT_WINDOW_SIZE = 0.14 # Based on default engine
-MIN_CAPABILITY = 0.8 # Least capability with intensity to pass intensity 1 chords
+
+# Based on default engine
+HIT_WINDOW_SIZE = 0.14
+STRUM_FRET_LENIENCY = 0.05
+STRUM_NOTE_LENIENCY = 0.025
+
+# For terminating the loop in set_leniencies
+HIT_WINDOW_NOISE = 0.005
+
+# Least min_pass_intensity possible: intensity 0
+MIN_CAPABILITY = 0.8
+
+# When missing a HOPO, probability that player strums to recover
+HOPO_RECOVERY = 0.4
+
+# The amount of greater intensity a player can operate at a time
+SKILL_HEATSINK_MAX = 2
+
+# Separation of left and right hand in get_intensity
+# HOPOs to strums = intensity increased by 1
+HAND_INDEPENDENCE = 1.4
 
 # Based on assumption: playing same song twice = ? increase in difficulty 
 ENDURANCE_CURVE = 0.0
@@ -19,8 +41,8 @@ FORCING_TO_RH_ACTIONS: Dict[Forcing, int] = {
 
 # Based roughly on subsequent multiplications by 0.75 
 DIFF_TO_ROCK_METER_SIZE: Dict[Diff, int] = {
-    Diff.EASY: 30, # 21,
-    Diff.MEDIUM: 36, # 28,
+    Diff.EASY: 42, # 21,
+    Diff.MEDIUM: 42, # 28,
     Diff.HARD: 42, # 37,
     Diff.EXPERT: 42 # 50
 }

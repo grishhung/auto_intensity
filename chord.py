@@ -13,6 +13,7 @@ class Chord:
     laned: bool = None              # Whether this note is in a lane
 
     leniency: float = None          # Extra amount of time allowed by 140ms hit window based on previous notes
+    overstrum_prob: float = None    # Heuristic probability that note is overstrummed given it is missed
     lh_vel: List[float] = []        # Reciprocals of delta time from previous distinct chords (includes leniency)
     rh_vel: List[float] = []        # Reciprocals of delta time from previous strummed chords (includes leniency)
     vel: float = None               # Reciprocal of delta time from previous chord
@@ -93,15 +94,30 @@ class Chord:
         # 1 if a strum or identical shape to previous chord
         self.rh_actions = FORCING_TO_RH_ACTIONS[self.forcing] or (prev_shape == self.shape)
 
+    def set_overstrum_prob(self, next_shape: Shape, next_time: float) -> None:
+        if next_shape != self.shape:
+            if self.forcing == Forcing.TAP:
+                self.overstrum_prob = 0
+            else:
+                self.overstrum_prob = 1
+        else:
+            delta = next_time - self.time
+            if delta < HIT_WINDOW_SIZE:
+                self.overstrum_prob = 0
+            else:
+                self.overstrum_prob = (delta - HIT_WINDOW_SIZE) / (delta - HIT_WINDOW_SIZE/2)
+            self.overstrum_prob = 1
+
 
     def get_intensity(self) -> float:
         """Local intensity of the current chord"""
+        p = HAND_INDEPENDENCE
         lh_intensity = sum([self.lh_vel[i] * self.lh_actions[i] for i in range(len(self.lh_vel))])
-        rh_intensity = sum(self.rh_vel) * self.rh_actions
+        rh_intensity = sum([self.rh_vel[i] for i in range(len(self.rh_vel))]) * self.rh_actions
         
         # Expected contribution of the chord n previous is 1/n, readjust sum accordingly
         note_lookback_factor = 1 / sum([1 / i for i in range(1, len(self.lh_vel) + 1)])
         
         # Floor of a note's intensity is 1 (1 action per second; a refretting + strum takes 3 actions)
-        local_intensity = max(1, note_lookback_factor * (lh_intensity + rh_intensity))
+        local_intensity = max(1, note_lookback_factor * (lh_intensity**p + rh_intensity**p)**(1/p)) # (lh_intensity + rh_intensity)
         return local_intensity

@@ -6,36 +6,53 @@ def main():
     
     directory = input('Enter directory path to charts:\n')
 
+    chart_labels = ['Guitar Easy', 'Guitar Medium', 'Guitar Hard', 'Guitar Expert',
+                    'Bass Easy', 'Bass Medium', 'Bass Hard', 'Bass Expert',
+                    'Rhythm Easy', 'Rhythm Medium', 'Rhythm Hard', 'Rhythm Expert',]
+
+    chart_names = {
+        'Guitar Easy':      'PART GUITAR',
+        'Guitar Medium':    'PART GUITAR',
+        'Guitar Hard':      'PART GUITAR',
+        'Guitar Expert':    'PART GUITAR',
+        'Bass Easy':        'PART BASS',
+        'Bass Medium':      'PART BASS',
+        'Bass Hard':        'PART BASS',
+        'Bass Expert':      'PART BASS',
+        'Rhythm Easy':      'PART RHYTHM',
+        'Rhythm Medium':    'PART RHYTHM',
+        'Rhythm Hard':      'PART RHYTHM',
+        'Rhythm Expert':    'PART RHYTHM'
+    }
+
+    chart_diffs = {
+        'Guitar Easy':      Diff.EASY,
+        'Guitar Medium':    Diff.MEDIUM,
+        'Guitar Hard':      Diff.HARD,
+        'Guitar Expert':    Diff.EXPERT,
+        'Bass Easy':        Diff.EASY,
+        'Bass Medium':      Diff.MEDIUM,
+        'Bass Hard':        Diff.HARD,
+        'Bass Expert':      Diff.EXPERT,
+        'Rhythm Easy':      Diff.EASY,
+        'Rhythm Medium':    Diff.MEDIUM,
+        'Rhythm Hard':      Diff.HARD,
+        'Rhythm Expert':    Diff.EXPERT
+    }
+    
     for filename in glob(directory + '/**/notes.mid', recursive=True):
         
         print(filename)
         
         charts = []
-        
-        custom_guitar_E = Chart('Guitar Easy', Diff.EASY, [])
-        custom_guitar_M = Chart('Guitar Medium', Diff.MEDIUM, [])
-        custom_guitar_H = Chart('Guitar Hard', Diff.HARD, [])
-        custom_guitar_X = Chart('Guitar Expert', Diff.EXPERT, [])
-        custom_bass_E = Chart('Bass Easy', Diff.EASY, [])
-        custom_bass_M = Chart('Bass Medium', Diff.MEDIUM, [])
-        custom_bass_H = Chart('Bass Hard', Diff.HARD, [])
-        custom_bass_X = Chart('Bass Expert', Diff.EXPERT, [])
-        custom_guitar_E.read_chart(filename, 'PART GUITAR')
-        custom_guitar_M.read_chart(filename, 'PART GUITAR')
-        custom_guitar_H.read_chart(filename, 'PART GUITAR')
-        custom_guitar_X.read_chart(filename, 'PART GUITAR')
-        custom_bass_E.read_chart(filename, 'PART BASS')
-        custom_bass_M.read_chart(filename, 'PART BASS')
-        custom_bass_H.read_chart(filename, 'PART BASS')
-        custom_bass_X.read_chart(filename, 'PART BASS')
-        charts.append(custom_guitar_E)
-        charts.append(custom_guitar_M)
-        charts.append(custom_guitar_H)
-        charts.append(custom_guitar_X)
-        charts.append(custom_bass_E)
-        charts.append(custom_bass_M)
-        charts.append(custom_bass_H)
-        charts.append(custom_bass_X)
+
+        for chart_label in chart_labels:
+            chart_name = chart_names[chart_label]
+            chart_diff = chart_diffs[chart_label]
+            chart = Chart(chart_label, chart_diff, [])
+            chart.read_chart(filename, chart_name)
+            if len(chart.chords) > 0:
+                charts.append(chart)
 
         calculate_all_chart_stats(charts)
 
