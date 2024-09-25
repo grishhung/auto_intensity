@@ -23,7 +23,7 @@ MIN_CAPABILITY = 0.8
 HOPO_RECOVERY = 0.4
 
 # The amount of greater intensity a player can operate at a time
-SKILL_HEATSINK_MAX = 2
+SKILL_HEATSINK_MAX = 0
 
 # Separation of left and right hand in get_intensity
 # HOPOs to strums = intensity increased by 1

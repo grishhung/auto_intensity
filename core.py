@@ -144,11 +144,12 @@ def prepare_chart_for_stat_collection(chart: Type[Chart]) -> None:
     set_rh_vels(chords)
     set_lh_actions(chords)
 
-def find_min_pass_intensity(intensities, strums, overstrum_probs, meter, start):
+def find_min_pass_intensity(intensities, chord_actions, overstrum_probs, meter, start):
     if len(intensities) == 0:
         return MIN_CAPABILITY
     left = MIN_CAPABILITY
     right = max(intensities)
+    last_fail = 0
     while right - left > 0.005:
         capability = (left + right) / 2
         meter_level = start
@@ -165,14 +166,17 @@ def find_min_pass_intensity(intensities, strums, overstrum_probs, meter, start):
                 hit_prob = 1
             else:
                 hit_prob = min(capability / intensity, 1)
+            hit_prob = min(capability / intensity, 1)
             overstrum_prob = overstrum_probs[i]
-            # To do: implement feature that taps don't need recovery
-            if strums[i]:
+            if chord_actions[i] == Forcing.STRUM:
                 e_prev_hit = hit_prob * 0.25 - (1 - hit_prob) * (1 + overstrum_prob)
                 e_prev_miss = hit_prob * 0.25 - (1 - hit_prob) * (1 + overstrum_prob)
-            else:
+            elif chord_actions[i] == Forcing.HOPO:
                 e_prev_hit = hit_prob * 0.25 - (1 - hit_prob)
-                e_prev_miss = HOPO_RECOVERY * (hit_prob * 0.25 - (1 - hit_prob) * (1 + overstrum_prob)) - (1 - HOPO_RECOVERY)
+                e_prev_miss = HOPO_RECOVERY * (hit_prob * 0.25 - (1 - hit_prob) * (1 + overstrum_prob)) - (1 - HOPO_RECOVERY) * 2
+            elif chord_actions[i] == Forcing.TAP:
+                e_prev_hit = hit_prob * 0.25 - (1 - hit_prob)
+                e_prev_miss = hit_prob * 0.25 - (1 - hit_prob)
             expected_change = prev_hit_prob * e_prev_hit + (1 - prev_hit_prob) * e_prev_miss
             meter_level = min(meter, meter_level+expected_change)
             prev_hit_prob = hit_prob
@@ -198,14 +202,16 @@ def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
     '''
 
     local_intensities = [chord.get_intensity() for chord in chords[1:]]
-    strums = [chord.rh_actions for chord in chords[1:]]
+    chord_actions = []
+    for chord in chords[1:]:
+        if chord.rh_actions:
+            chord_actions.append(Forcing.STRUM)
+        else:
+            chord_actions.append(chord.forcing)
     overstrum_probs = [chord.overstrum_prob for chord in chords[1:]]
 
-    if False:
-        for i in range(len(chords[1:])):
-            print(chords[i].leniency)
-
-    min_pass_intensity = find_min_pass_intensity(local_intensities, strums, overstrum_probs, DIFF_TO_ROCK_METER_SIZE[chart.diff], 5 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 6)
+    min_pass_intensity = find_min_pass_intensity(local_intensities, chord_actions, overstrum_probs,
+                                                 DIFF_TO_ROCK_METER_SIZE[chart.diff], 5 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 6,)
 
     # Make chart intensity agnostic with respect to the rock meter size
     # chart_intensity = CURVE_FINAL_MULT * math.log(relative_intensity_max / sample_size, 2)
