@@ -87,7 +87,7 @@ class Chord:
 
     def set_lh_actions(self) -> None:
         # Composite of presses and lifts
-        self.lh_actions = [count_frets(self.lifts[i]) + count_frets(self.presses[i]) for i in range(len(self.lifts))]
+        self.lh_actions = [harmonic_sum(count_frets(self.lifts[i]) + count_frets(self.presses[i])) for i in range(len(self.lifts))]
 
 
     def set_rh_actions(self, prev_shape: Shape) -> None:
@@ -114,10 +114,13 @@ class Chord:
         p = HAND_INDEPENDENCE
         lh_intensity = sum([self.lh_vel[i] * self.lh_actions[i] for i in range(len(self.lh_vel))])
         rh_intensity = sum([self.rh_vel[i] for i in range(len(self.rh_vel))]) * self.rh_actions
+
+        lh_intensity = max(lh_intensity, EPSILON)
+        rh_intensity = max(lh_intensity, EPSILON)
         
         # Expected contribution of the chord n previous is 1/n, readjust sum accordingly
-        note_lookback_factor = 1 / sum([1 / i for i in range(1, len(self.lh_vel) + 1)])
+        note_lookback_factor = 1 / harmonic_sum(len(self.lh_vel))
         
         # Floor of a note's intensity is 1 (1 action per second; a refretting + strum takes 3 actions)
-        local_intensity = max(1, note_lookback_factor * (lh_intensity**p + rh_intensity**p)**(1/p)) # (lh_intensity + rh_intensity)
+        local_intensity = max(1, note_lookback_factor * (lh_intensity**p+rh_intensity**p)**(1/p)) # (lh_intensity + rh_intensity)
         return local_intensity

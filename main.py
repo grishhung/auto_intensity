@@ -1,4 +1,6 @@
 from core import *
+from metadatareader import MetadataReader
+from csv import DictWriter
 
 from glob import glob
 
@@ -39,10 +41,20 @@ def main():
         'Rhythm Hard':      Diff.HARD,
         'Rhythm Expert':    Diff.EXPERT
     }
+
+    data = []
     
     for filename in glob(directory + '/**/notes.mid', recursive=True):
-        
-        print(filename)
+
+        filename_ini = filename[:-9] + 'song.ini'
+        ini_reader = MetadataReader()
+        ini_reader.read(filename_ini)
+        song_info = ini_reader.get_info()
+
+        if 'artist' in song_info.keys() and 'name' in song_info.keys():
+            print(song_info['artist'] + ' - ' + song_info['name'])
+        else:
+            print(filename)
         
         charts = []
 
@@ -54,7 +66,27 @@ def main():
             if len(chart.chords) > 0:
                 charts.append(chart)
 
-        calculate_all_chart_stats(charts)
+        song_info.update(calculate_all_chart_stats(charts))
+        data.append(song_info)
+
+    fieldnames = ['artist', 'name',
+                    'Guitar Easy', 'Guitar Medium', 'Guitar Hard', 'Guitar Expert', 'diff_guitar',
+                    'Bass Easy', 'Bass Medium', 'Bass Hard', 'Bass Expert', 'diff_bass',
+                    'Rhythm Easy', 'Rhythm Medium', 'Rhythm Hard', 'Rhythm Expert', 'diff_rhythm']
+    csv_data = []
+    for song_info in data:
+        csv_song_info = {}
+        for attribute in fieldnames:
+            if attribute in song_info.keys():
+                csv_song_info[attribute] = song_info[attribute]
+            else:
+                csv_song_info[attribute] = "N/A"
+        csv_data.append(csv_song_info)
+
+    with open(directory + '/results.csv', 'w', newline='') as csvfile:
+        writer = DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(csv_data)
 
 
 if __name__=="__main__":

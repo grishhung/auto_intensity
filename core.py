@@ -87,7 +87,7 @@ def set_rh_actions(chords: List[Type[Chord]]) -> None:
             chord.rh_actions = 1
             chord.overstrum_prob = 1
         else:
-            prev_chords = [chords[strum_indices[-1]], chords[strum_indices[-2]]]
+            prev_chords = [chords[strum_indices[-1]] , chords[strum_indices[-2]]]
             prev_times = [chord.time for chord in prev_chords]
             chord.set_rh_actions(chords[i - 1].shape)
             if i == len(chords) - 1:
@@ -144,53 +144,61 @@ def prepare_chart_for_stat_collection(chart: Type[Chart]) -> None:
     set_rh_vels(chords)
     set_lh_actions(chords)
 
+def simulate_run(intensities, chord_actions, overstrum_probs, meter, start, capability):
+    meter_level = start
+    skill_heatsink_max = capability * SKILL_HEATSINK_MAX
+    skill_heatsink = skill_heatsink_max
+    chart_passed = True
+    prev_hit_prob = 1
+    for i, intensity in enumerate(intensities):
+        if skill_heatsink > 0:
+            skill_heatsink = min(skill_heatsink_max, skill_heatsink + capability - intensity)
+        else:
+            skill_heatsink = skill_heatsink + capability
+        if skill_heatsink > 0:
+            hit_prob = 1
+        else:
+            hit_prob = min(capability / intensity, 1)
+        hit_prob = min(capability / intensity, 1)
+        overstrum_prob = overstrum_probs[i]
+        if chord_actions[i] == Forcing.STRUM:
+            e_prev_hit = hit_prob * 0.25 - (1 - hit_prob) * (1 + overstrum_prob)
+            e_prev_miss = hit_prob * 0.25 - (1 - hit_prob) * (1 + overstrum_prob)
+        elif chord_actions[i] == Forcing.HOPO:
+            e_prev_hit = hit_prob * 0.25 - (1 - hit_prob)
+            e_prev_miss = HOPO_RECOVERY * (hit_prob * 0.25 - (1 - hit_prob) * (1 + overstrum_prob)) - (1 - HOPO_RECOVERY)
+        elif chord_actions[i] == Forcing.TAP:
+            e_prev_hit = hit_prob * 0.25 - (1 - hit_prob)
+            e_prev_miss = hit_prob * 0.25 - (1 - hit_prob)
+        expected_change = prev_hit_prob * e_prev_hit + (1 - prev_hit_prob) * e_prev_miss
+        meter_level = min(meter, meter_level+expected_change)
+        prev_hit_prob = hit_prob
+        if meter_level < 0:
+            chart_passed = False
+            break
+    return chart_passed
+
+
 def find_min_pass_intensity(intensities, chord_actions, overstrum_probs, meter, start):
     if len(intensities) == 0:
-        return MIN_CAPABILITY
+        return (MIN_CAPABILITY, False)
     left = MIN_CAPABILITY
     right = max(intensities)
     last_fail = 0
     while right - left > 0.005:
         capability = (left + right) / 2
-        meter_level = start
-        skill_heatsink_max = capability * SKILL_HEATSINK_MAX
-        skill_heatsink = skill_heatsink_max
-        chart_passed = True
-        prev_hit_prob = 1
-        for i, intensity in enumerate(intensities):
-            if skill_heatsink > 0:
-                skill_heatsink = min(skill_heatsink_max, skill_heatsink + capability - intensity)
-            else:
-                skill_heatsink = skill_heatsink + capability
-            if skill_heatsink > 0:
-                hit_prob = 1
-            else:
-                hit_prob = min(capability / intensity, 1)
-            hit_prob = min(capability / intensity, 1)
-            overstrum_prob = overstrum_probs[i]
-            if chord_actions[i] == Forcing.STRUM:
-                e_prev_hit = hit_prob * 0.25 - (1 - hit_prob) * (1 + overstrum_prob)
-                e_prev_miss = hit_prob * 0.25 - (1 - hit_prob) * (1 + overstrum_prob)
-            elif chord_actions[i] == Forcing.HOPO:
-                e_prev_hit = hit_prob * 0.25 - (1 - hit_prob)
-                e_prev_miss = HOPO_RECOVERY * (hit_prob * 0.25 - (1 - hit_prob) * (1 + overstrum_prob)) - (1 - HOPO_RECOVERY) * 2
-            elif chord_actions[i] == Forcing.TAP:
-                e_prev_hit = hit_prob * 0.25 - (1 - hit_prob)
-                e_prev_miss = hit_prob * 0.25 - (1 - hit_prob)
-            expected_change = prev_hit_prob * e_prev_hit + (1 - prev_hit_prob) * e_prev_miss
-            meter_level = min(meter, meter_level+expected_change)
-            prev_hit_prob = hit_prob
-            if meter_level < 0:
-                chart_passed = False
-                break
+        chart_passed = simulate_run(intensities, chord_actions, overstrum_probs, meter, start, capability)
         if chart_passed:
             right = capability
         else:
             left = capability
-    return right
+    # Can a player 2 intensity level higher (minimum 5) play this chart competently? If not, put asterisk
+    asterisk = not simulate_run(intensities, chord_actions, overstrum_probs,
+                            meter / 8, start / 8, max(math.pow(2, 5 / CURVE_FINAL_MULT), capability * math.pow(2, 2 / CURVE_FINAL_MULT)))
+    return (right, asterisk)
 
 
-def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
+def calculate_chart_stats(chart: Type[Chart], is_last: bool, print_results: bool) -> None:
     chords = chart.chords
     n = len(chords)
 
@@ -210,24 +218,29 @@ def calculate_chart_stats(chart: Type[Chart], is_last: bool) -> None:
             chord_actions.append(chord.forcing)
     overstrum_probs = [chord.overstrum_prob for chord in chords[1:]]
 
-    min_pass_intensity = find_min_pass_intensity(local_intensities, chord_actions, overstrum_probs,
-                                                 DIFF_TO_ROCK_METER_SIZE[chart.diff], 5 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 6,)
+    min_pass_intensity, asterisk = find_min_pass_intensity(local_intensities, chord_actions, overstrum_probs,
+                                                 DIFF_TO_ROCK_METER_SIZE[chart.diff], 5 * DIFF_TO_ROCK_METER_SIZE[chart.diff] // 6)
 
     # Make chart intensity agnostic with respect to the rock meter size
     # chart_intensity = CURVE_FINAL_MULT * math.log(relative_intensity_max / sample_size, 2)
     chart_intensity = CURVE_FINAL_MULT * max(0, math.log(min_pass_intensity / MIN_CAPABILITY, 2))
 
-    print_name(chart.name, is_last)
-    print_stat('note count', f'{n:.2f} n', is_last, False)
-    #print_stat('avg vel', f'{avg_vel:.2f} n/s', is_last, False)
-    #print_stat('avg abs acc', f'{avg_abs_acc:.2f} n/s^2', is_last, False)
-    #print_stat('avg LH actions', f'{avg_lh_actions:.2f}', is_last, False)
-    #print_stat('avg anchor count', f'{avg_anch:.2f}', is_last, False)
-    print_stat('intensity', f'{chart_intensity:.2f}', is_last, True)
+    if print_results:
+        print_name(chart.name, is_last)
+        print_stat('note count', f'{n:.2f} n', is_last, False)
+        #print_stat('avg vel', f'{avg_vel:.2f} n/s', is_last, False)
+        #print_stat('avg abs acc', f'{avg_abs_acc:.2f} n/s^2', is_last, False)
+        #print_stat('avg LH actions', f'{avg_lh_actions:.2f}', is_last, False)
+        #print_stat('avg anchor count', f'{avg_anch:.2f}', is_last, False)
+        print_stat('intensity', f'{chart_intensity:.2f}' + (asterisk * '*'), is_last, True)
+
+    return f"{chart_intensity:.2f}"
 
 
 def calculate_all_chart_stats(charts: List[Type[Chart]]):
-    print('CHART STATISTICS')
+    # print('CHART STATISTICS')
+    results = {}
     for i, chart in enumerate(charts):
         prepare_chart_for_stat_collection(chart)
-        calculate_chart_stats(chart, i == len(charts) - 1)
+        results[chart.name] = calculate_chart_stats(chart, i == len(charts) - 1, False)
+    return results

@@ -41,6 +41,7 @@ class Chart:
         current_tick = 0
         previous_tick = 0
         current_chord = 0b_00000_0
+        chord_to_add = None
         active_mods = []
         active_lanes = []
         mid_to_note = MID_TO_NOTE[self.diff]
@@ -55,6 +56,21 @@ class Chart:
                 tempo_ptr += 1
             current_time += ticks_to_add / ticks_per_beat * tempo_list[tempo_ptr][1] / 1000000
             current_tick += ticks_to_add
+
+            if current_tick > previous_tick:
+                if current_chord != 0b_00000_0:
+                    forcing = Forcing.STRUM
+                    if current_tick - previous_tick <= 17 * ticks_per_beat / 48:
+                        forcing = Forcing.HOPO
+                    if len(active_mods) > 0:
+                        forcing = mid_to_mod[max(active_mods)]
+                    laned = False
+                    if len(active_lanes) > 0:
+                        laned = True
+                    chord_to_add = Chord(previous_time, current_chord, forcing, laned)
+                    current_chord = 0b_00000_0
+                previous_tick = current_tick
+                previous_time = current_time
             
             if msg.type not in ['note_on', 'note_off']:
                 continue
@@ -70,22 +86,9 @@ class Chart:
                 elif msg.type == 'note_off':
                     active_lanes.remove(msg.note)
             if msg.note not in mid_to_note.keys():
-                continue
-            
+                continue            
             if msg.type == 'note_on':
-                if current_tick > previous_tick:
-                    if current_chord != 0b_00000_0:
-                        forcing = Forcing.STRUM
-                        if current_tick - previous_tick <= 17 * ticks_per_beat / 48:
-                            forcing = Forcing.HOPO
-                        if len(active_mods) > 0:
-                            forcing = mid_to_mod[max(active_mods)]
-                        laned = False
-                        if len(active_lanes) > 0:
-                            laned = True
-                        chord = Chord(previous_time, current_chord, forcing, laned)
-                        self.add_chord(chord)
-                        current_chord = 0b_00000_0
-                    previous_tick = current_tick
-                    previous_time = current_time
                 current_chord += mid_to_note[msg.note]
+                if chord_to_add is not None:
+                    self.add_chord(chord_to_add)
+                    chord_to_add = None

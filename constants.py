@@ -32,6 +32,8 @@ HAND_INDEPENDENCE = 1.4
 # Based on assumption: playing same song twice = ? increase in difficulty 
 ENDURANCE_CURVE = 0.0
 
+EPSILON = 10**(-7)
+
 # Based on whether a strum is required
 FORCING_TO_RH_ACTIONS: Dict[Forcing, int] = {
     Forcing.STRUM: 1,
